@@ -2,11 +2,13 @@ package force
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 
 	"github.com/nimajalali/go-force/forcejson"
 )
@@ -64,11 +66,20 @@ func (forceApi *ForceApi) request(method, path string, params url.Values, payloa
 	// Build body
 	var body io.Reader
 	if payload != nil {
+		var jsonBytes []byte
+		var err error
 
-		jsonBytes, err := forcejson.Marshal(payload)
+		if reflect.ValueOf(payload).Kind() == reflect.Map {
+			jsonBytes, err = json.Marshal(payload)
+		} else {
+			jsonBytes, err = forcejson.Marshal(payload)
+		}
+
 		if err != nil {
 			return fmt.Errorf("Error marshaling encoded payload: %v", err)
 		}
+
+		fmt.Println(string(jsonBytes))
 
 		body = bytes.NewReader(jsonBytes)
 	}

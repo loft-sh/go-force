@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 )
 
@@ -96,7 +97,50 @@ func (forceApi *ForceApi) InsertSObject(in SObject) (resp *SObjectResponse, err 
 func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 	uri := strings.Replace(forceApi.apiSObjects[in.ApiName()].URLs[rowTemplateKey], idKey, id, 1)
 
-	err = forceApi.Patch(uri, nil, in.(interface{}), nil)
+	fieldsByTag := map[string]interface{}{}
+	key := "force"
+
+	ref := reflect.ValueOf(in).Elem()
+	rt := ref.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		fieldName := strings.Split(f.Tag.Get(key), ",")[0] // use split to ignore tag "options"
+		if fieldName == "" || fieldName == "-" {
+			continue
+		}
+
+		fieldValue := ref.FieldByName(f.Name)
+		if fieldValue.Kind() == reflect.Pointer {
+			fieldValue = fieldValue.Elem()
+		}
+
+		var val interface{}
+
+		switch fieldValue.Kind() {
+		case reflect.String:
+			val = fieldValue.String()
+		case reflect.Bool:
+			val = fieldValue.Bool()
+		}
+		fieldsByTag[fieldName] = val
+	}
+
+	objectDescription, err := forceApi.DescribeSObject(in)
+	if err != nil {
+		return err
+	}
+
+	attributes := map[string]interface{}{}
+	for _, field := range objectDescription.Fields {
+		if field.Updateable {
+			val, ok := fieldsByTag[field.Name]
+			if ok && val != nil {
+				attributes[field.Name] = val
+			}
+		}
+	}
+
+	err = forceApi.Patch(uri, nil, attributes, nil)
 
 	return
 }
