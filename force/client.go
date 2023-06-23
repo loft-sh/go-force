@@ -79,8 +79,6 @@ func (forceApi *ForceApi) request(method, path string, params url.Values, payloa
 			return fmt.Errorf("Error marshaling encoded payload: %v", err)
 		}
 
-		fmt.Println(string(jsonBytes))
-
 		body = bytes.NewReader(jsonBytes)
 	}
 
