@@ -100,7 +100,12 @@ func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 	fieldsByTag := map[string]interface{}{}
 	key := "force"
 
-	ref := reflect.ValueOf(in).Elem()
+	ref := reflect.ValueOf(in)
+
+	if ref.Kind() == reflect.Pointer {
+		ref = ref.Elem()
+	}
+
 	rt := ref.Type()
 	for i := 0; i < rt.NumField(); i++ {
 		f := rt.Field(i)
