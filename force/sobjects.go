@@ -87,9 +87,13 @@ func (forceApi *ForceApi) GetSObject(id string, fields []string, out SObject) (e
 
 func (forceApi *ForceApi) InsertSObject(in SObject) (resp *SObjectResponse, err error) {
 	uri := forceApi.apiSObjects[in.ApiName()].URLs[sObjectKey]
-
 	resp = &SObjectResponse{}
-	err = forceApi.Post(uri, nil, in.(interface{}), resp)
+
+	attributes, err := forceApi.getAttributes(in, true)
+	if err != nil {
+		return nil, err
+	}
+	err = forceApi.Post(uri, nil, attributes, resp)
 
 	return
 }
@@ -97,6 +101,16 @@ func (forceApi *ForceApi) InsertSObject(in SObject) (resp *SObjectResponse, err 
 func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 	uri := strings.Replace(forceApi.apiSObjects[in.ApiName()].URLs[rowTemplateKey], idKey, id, 1)
 
+	attributes, err := forceApi.getAttributes(in, false)
+	if err != nil {
+		return err
+	}
+	err = forceApi.Patch(uri, nil, attributes, nil)
+
+	return
+}
+
+func (forceApi *ForceApi) getAttributes(in SObject, isInsert bool) (map[string]interface{}, error) {
 	fieldsByTag := map[string]interface{}{}
 	key := "force"
 
@@ -126,13 +140,17 @@ func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 			val = fieldValue.String()
 		case reflect.Bool:
 			val = fieldValue.Bool()
+		case reflect.Int64:
+			val = fieldValue.Int()
+		case reflect.Struct:
+			val = fieldValue.Interface()
 		}
 		fieldsByTag[fieldName] = val
 	}
 
 	objectDescription, err := forceApi.DescribeSObject(in)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	attributes := map[string]interface{}{}
@@ -145,9 +163,7 @@ func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 		}
 	}
 
-	err = forceApi.Patch(uri, nil, attributes, nil)
-
-	return
+	return attributes, nil
 }
 
 func (forceApi *ForceApi) DeleteSObject(id string, in SObject) (err error) {
@@ -177,7 +193,15 @@ func (forceApi *ForceApi) UpsertSObjectByExternalId(id string, in SObject) (resp
 		in.ExternalIdApiName(), id)
 
 	resp = &SObjectResponse{}
-	err = forceApi.Patch(uri, nil, in.(interface{}), resp)
+
+	attributes, err := forceApi.getAttributes(in, false)
+	if err != nil {
+		return nil, err
+	}
+
+	delete(attributes, in.ExternalIdApiName())
+
+	err = forceApi.Patch(uri, nil, attributes, resp)
 
 	return
 }
