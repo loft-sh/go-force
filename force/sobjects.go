@@ -77,6 +77,21 @@ func (forceApi *ForceApi) GetSObject(id string, fields []string, out SObject) (e
 
 	params := url.Values{}
 	if len(fields) > 0 {
+		attributes, err := forceApi.getAttributes(out, false, true)
+		if err != nil {
+			return err
+		}
+
+		for i := range fields {
+			attributes[fields[i]] = nil
+		}
+
+		// add base object fields
+		fields = []string{}
+		for k := range attributes {
+			fields = append(fields, k)
+		}
+
 		params.Add("fields", strings.Join(fields, ","))
 	}
 
@@ -89,7 +104,7 @@ func (forceApi *ForceApi) InsertSObject(in SObject) (resp *SObjectResponse, err 
 	uri := forceApi.apiSObjects[in.ApiName()].URLs[sObjectKey]
 	resp = &SObjectResponse{}
 
-	attributes, err := forceApi.getAttributes(in, true)
+	attributes, err := forceApi.getAttributes(in, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +116,7 @@ func (forceApi *ForceApi) InsertSObject(in SObject) (resp *SObjectResponse, err 
 func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 	uri := strings.Replace(forceApi.apiSObjects[in.ApiName()].URLs[rowTemplateKey], idKey, id, 1)
 
-	attributes, err := forceApi.getAttributes(in, false)
+	attributes, err := forceApi.getAttributes(in, false, false)
 	if err != nil {
 		return err
 	}
@@ -110,7 +125,7 @@ func (forceApi *ForceApi) UpdateSObject(id string, in SObject) (err error) {
 	return
 }
 
-func (forceApi *ForceApi) getAttributes(in SObject, isInsert bool) (map[string]interface{}, error) {
+func (forceApi *ForceApi) getAttributes(in SObject, isInsert bool, isGet bool) (map[string]interface{}, error) {
 	fieldsByTag := map[string]interface{}{}
 	key := "force"
 
@@ -119,6 +134,8 @@ func (forceApi *ForceApi) getAttributes(in SObject, isInsert bool) (map[string]i
 	if ref.Kind() == reflect.Pointer {
 		ref = ref.Elem()
 	}
+
+	sobjectType := reflect.TypeOf((*SObject)(nil)).Elem()
 
 	rt := ref.Type()
 	for i := 0; i < rt.NumField(); i++ {
@@ -144,6 +161,12 @@ func (forceApi *ForceApi) getAttributes(in SObject, isInsert bool) (map[string]i
 			val = fieldValue.Int()
 		case reflect.Struct:
 			val = fieldValue.Interface()
+			if fieldValue.Type().Implements(sobjectType) {
+				idField := fieldValue.FieldByName("Id")
+				if idField.IsValid() {
+					val = idField.Interface()
+				}
+			}
 		}
 		fieldsByTag[fieldName] = val
 	}
@@ -155,9 +178,21 @@ func (forceApi *ForceApi) getAttributes(in SObject, isInsert bool) (map[string]i
 
 	attributes := map[string]interface{}{}
 	for _, field := range objectDescription.Fields {
-		if field.Updateable {
-			val, ok := fieldsByTag[field.Name]
-			if ok && val != nil {
+		fieldName := field.Name
+		isRelationship := field.RelationshipName != ""
+		if isRelationship {
+			fieldName = field.RelationshipName
+		}
+
+		val, ok := fieldsByTag[fieldName]
+		if ok {
+			if isGet {
+				if isRelationship {
+					attributes[fieldName+".Id"] = val
+				} else {
+					attributes[field.Name] = val
+				}
+			} else if field.Updateable && val != nil {
 				attributes[field.Name] = val
 			}
 		}
@@ -194,7 +229,7 @@ func (forceApi *ForceApi) UpsertSObjectByExternalId(id string, in SObject) (resp
 
 	resp = &SObjectResponse{}
 
-	attributes, err := forceApi.getAttributes(in, false)
+	attributes, err := forceApi.getAttributes(in, false, false)
 	if err != nil {
 		return nil, err
 	}
