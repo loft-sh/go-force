@@ -82,6 +82,20 @@ func (forceApi *ForceApi) request(method, path string, params url.Values, payloa
 		body = bytes.NewReader(jsonBytes)
 	}
 
+	if forceApi.debugMode && method != "GET" {
+		fmt.Printf("debug: salesforce request: %s\n", uri.String())
+
+		if body != nil {
+			reqBytes, err := ioutil.ReadAll(body)
+			if err != nil {
+				return fmt.Errorf("Error reading request bytes: %v", err)
+			}
+			fmt.Printf("Body: %s\n", string(reqBytes))
+		}
+
+		return nil
+	}
+
 	// Build Request
 	req, err := http.NewRequest(method, uri.String(), body)
 	if err != nil {
