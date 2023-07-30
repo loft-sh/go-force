@@ -65,8 +65,8 @@ func (forceApi *ForceApi) request(method, path string, params url.Values, payloa
 
 	// Build body
 	var body io.Reader
+	var jsonBytes []byte
 	if payload != nil {
-		var jsonBytes []byte
 		var err error
 
 		if reflect.ValueOf(payload).Kind() == reflect.Map {
@@ -151,6 +151,9 @@ func (forceApi *ForceApi) request(method, path string, params url.Values, payloa
 
 				return forceApi.request(method, path, params, payload, out)
 			}
+
+			apiErrors[0].RequestURL = uri.String()
+			apiErrors[0].RequestBody = string(jsonBytes)
 
 			return apiErrors
 		}

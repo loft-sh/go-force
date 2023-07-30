@@ -206,6 +206,13 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 				if field.Name == "CurrencyIsoCode" {
 					val = strings.ToUpper(val.(string))
 				} else if isRelationship {
+					valRef := reflect.ValueOf(val)
+					if valRef.Kind() == reflect.Struct {
+						idField, ok := valRef.Type().FieldByName("Id")
+						if ok {
+							val = getFieldValue(valRef, idField, reflect.Value{}, "")
+						}
+					}
 					attributes[field.Name] = val
 				} else if field.Updateable {
 					attributes[field.Name] = val
@@ -250,7 +257,7 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 						setValue(fieldValue, fieldValueExternal)
 					}
 				} else {
-					if refType.Kind() == reflect.Float64 {
+					if refType.Kind() == reflect.Float64 && fieldValueExternal.Kind() == reflect.Int64 {
 						fieldValueExternal = reflect.ValueOf(float64(fieldValueExternal.Int()) / 100)
 					}
 					setValue(fieldValue, fieldValueExternal)

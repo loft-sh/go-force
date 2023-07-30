@@ -14,6 +14,8 @@ type ApiError struct {
 	ErrorCode        string   `json:"errorCode,omitempty" force:"errorCode,omitempty"`
 	ErrorName        string   `json:"error,omitempty" force:"error,omitempty"`
 	ErrorDescription string   `json:"error_description,omitempty" force:"error_description,omitempty"`
+	RequestURL       string   `json:"requestURL,omitempty"`
+	RequestBody      string   `json:"requestBody,omitempty"`
 }
 
 func (e ApiErrors) Error() string {
