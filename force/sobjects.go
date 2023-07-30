@@ -232,7 +232,8 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 	}
 
 	fieldValue := ref.FieldByName(field.Name)
-	if externalObjRef.Kind() == reflect.Struct {
+	switch externalObjRef.Kind() {
+	case reflect.Struct:
 		if fieldNameExternal != "" && fieldNameExternal != "-" {
 			fieldNameExternalSplit := strings.Split(fieldNameExternal, ".")
 			fieldValueExternal := externalObjRef.FieldByName(fieldNameExternalSplit[0])
@@ -263,6 +264,11 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 					setValue(fieldValue, fieldValueExternal)
 				}
 			}
+		}
+	case reflect.Map:
+		mapValue := externalObjRef.MapIndex(reflect.ValueOf(fieldNameExternal))
+		if mapValue.IsZero() == false {
+			fieldValue = mapValue
 		}
 	}
 
