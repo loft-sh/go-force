@@ -267,7 +267,7 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 		}
 	case reflect.Map:
 		mapValue := externalObjRef.MapIndex(reflect.ValueOf(fieldNameExternal))
-		if mapValue.IsZero() == false {
+		if mapValue.IsValid() && mapValue.IsZero() == false {
 			fieldValue = mapValue
 		}
 	}
