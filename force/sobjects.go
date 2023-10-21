@@ -132,8 +132,13 @@ func (forceApi *ForceApi) Debug(enable bool) {
 	forceApi.debugMode = enable
 }
 
+type attribute struct {
+	Value                  interface{}
+	IsValueFromExternalObj bool
+}
+
 func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isInsert bool, isGet bool) (map[string]interface{}, error) {
-	fieldsByTag := map[string]interface{}{}
+	fieldsByTag := map[string]attribute{}
 
 	ref := reflect.ValueOf(in)
 	if ref.Kind() == reflect.Pointer {
@@ -153,7 +158,7 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 
 		// use split to ignore tag "options"
 		fieldNameExternal := strings.Split(field.Tag.Get("ext"), ",")[0]
-		val := getFieldValue(ref, field, externalObjRef, fieldNameExternal)
+		val, isValueFromExternalObj := getFieldValue(ref, field, externalObjRef, fieldNameExternal)
 
 		isCountryField := strings.HasSuffix(fieldNameSFDC, "Country")
 		if isCountryField || strings.HasSuffix(fieldNameSFDC, "State") {
@@ -178,7 +183,10 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 			}
 		}
 
-		fieldsByTag[fieldNameSFDC] = val
+		fieldsByTag[fieldNameSFDC] = attribute{
+			Value:                  val,
+			IsValueFromExternalObj: isValueFromExternalObj,
+		}
 	}
 
 	objectDescription, err := forceApi.DescribeSObject(in)
@@ -194,8 +202,9 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 			fieldName = field.RelationshipName
 		}
 
-		val, ok := fieldsByTag[fieldName]
+		attribute, ok := fieldsByTag[fieldName]
 		if ok {
+			val := attribute.Value
 			if isGet {
 				if isRelationship {
 					attributes[fieldName+".Id"] = val
@@ -203,18 +212,25 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 					attributes[field.Name] = val
 				}
 			} else if val != nil {
-				if field.Name == "CurrencyIsoCode" {
+				if field.Type == "currency" && attribute.IsValueFromExternalObj {
+					valFloat64, ok := val.(float64)
+					if ok {
+						val = valFloat64 / 100
+					}
+				} else if field.Name == "CurrencyIsoCode" {
 					val = strings.ToUpper(val.(string))
 				} else if isRelationship {
 					valRef := reflect.ValueOf(val)
 					if valRef.Kind() == reflect.Struct {
 						idField, ok := valRef.Type().FieldByName("Id")
 						if ok {
-							val = getFieldValue(valRef, idField, reflect.Value{}, "")
+							val, _ = getFieldValue(valRef, idField, reflect.Value{}, "")
 						}
 					}
 					attributes[field.Name] = val
-				} else if field.Updateable {
+				}
+
+				if field.Updateable {
 					attributes[field.Name] = val
 				}
 			}
@@ -226,7 +242,8 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 
 var sobjectType = reflect.TypeOf((*SObject)(nil)).Elem()
 
-func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef reflect.Value, fieldNameExternal string) interface{} {
+func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef reflect.Value, fieldNameExternal string) (interface{}, bool) {
+	isValueFromExternalObj := false
 	if externalObjRef.Kind() == reflect.Pointer {
 		externalObjRef = externalObjRef.Elem()
 	}
@@ -237,10 +254,12 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 		if fieldNameExternal != "" && fieldNameExternal != "-" {
 			fieldNameExternalSplit := strings.Split(fieldNameExternal, ".")
 			fieldValueExternal := externalObjRef.FieldByName(fieldNameExternalSplit[0])
-			if fieldValueExternal.IsValid() && fieldValueExternal.IsZero() == false {
+			if fieldValueExternal.IsValid() && !fieldValueExternal.IsZero() {
 				if len(fieldNameExternalSplit) > 1 {
 					return getFieldValue(ref, field, fieldValueExternal, strings.Join(fieldNameExternalSplit[1:], "."))
 				}
+
+				isValueFromExternalObj = true
 
 				refType := fieldValue.Type()
 				if refType.Kind() == reflect.Pointer {
@@ -259,7 +278,7 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 					}
 				} else {
 					if refType.Kind() == reflect.Float64 && fieldValueExternal.Kind() == reflect.Int64 {
-						fieldValueExternal = reflect.ValueOf(float64(fieldValueExternal.Int()) / 100)
+						fieldValueExternal = reflect.ValueOf(float64(fieldValueExternal.Int()))
 					}
 					setValue(fieldValue, fieldValueExternal)
 				}
@@ -267,7 +286,8 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 		}
 	case reflect.Map:
 		mapValue := externalObjRef.MapIndex(reflect.ValueOf(fieldNameExternal))
-		if mapValue.IsValid() && mapValue.IsZero() == false {
+		if mapValue.IsValid() && !mapValue.IsZero() {
+			isValueFromExternalObj = true
 			fieldValue = mapValue
 		}
 	}
@@ -278,13 +298,13 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 
 	switch fieldValue.Kind() {
 	case reflect.String:
-		return fieldValue.String()
+		return fieldValue.String(), isValueFromExternalObj
 	case reflect.Bool:
-		return fieldValue.Bool()
+		return fieldValue.Bool(), isValueFromExternalObj
 	case reflect.Int64:
-		return fieldValue.Int()
+		return fieldValue.Int(), isValueFromExternalObj
 	case reflect.Float64:
-		return fieldValue.Float()
+		return fieldValue.Float(), isValueFromExternalObj
 	case reflect.Struct:
 		val := fieldValue.Interface()
 		if fieldValue.Type().Implements(sobjectType) {
@@ -293,9 +313,9 @@ func getFieldValue(ref reflect.Value, field reflect.StructField, externalObjRef 
 				val = idField.Interface()
 			}
 		}
-		return val
+		return val, isValueFromExternalObj
 	}
-	return nil
+	return nil, isValueFromExternalObj
 }
 
 func setValue(fieldValue reflect.Value, fieldValueExternal reflect.Value) {
