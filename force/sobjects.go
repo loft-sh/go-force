@@ -168,7 +168,6 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 					country := countries.ByName(stringVal)
 					countryCode := country.Alpha2()
 					if len(countryCode) == 2 {
-						val = countryCode
 						stringVal = countryCode
 					}
 				}
@@ -178,6 +177,7 @@ func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isI
 					_, codeFieldExists := rt.FieldByName(codeFieldName)
 					if codeFieldExists {
 						fieldNameSFDC = codeFieldName
+						val = stringVal
 					}
 				}
 			}
