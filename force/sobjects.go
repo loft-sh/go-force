@@ -80,7 +80,7 @@ func (forceApi *ForceApi) GetSObject(id string, fields []string, out SObject) (e
 
 	params := url.Values{}
 	if len(fields) > 0 {
-		attributes, err := forceApi.getAttributes(out, nil, false, true)
+		attributes, err := forceApi.GetAttributes(out, nil, false, true)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (forceApi *ForceApi) InsertSObject(in SObject, externalObj interface{}) (re
 	uri := forceApi.apiSObjects[in.ApiName()].URLs[sObjectKey]
 	resp = &SObjectResponse{}
 
-	attributes, err := forceApi.getAttributes(in, externalObj, true, false)
+	attributes, err := forceApi.GetAttributes(in, externalObj, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (forceApi *ForceApi) InsertSObject(in SObject, externalObj interface{}) (re
 func (forceApi *ForceApi) UpdateSObject(id string, in SObject, externalObj interface{}) (err error) {
 	uri := strings.Replace(forceApi.apiSObjects[in.ApiName()].URLs[rowTemplateKey], idKey, id, 1)
 
-	attributes, err := forceApi.getAttributes(in, externalObj, false, false)
+	attributes, err := forceApi.GetAttributes(in, externalObj, false, false)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ type attribute struct {
 	IsValueFromExternalObj bool
 }
 
-func (forceApi *ForceApi) getAttributes(in SObject, externalObj interface{}, isInsert bool, isGet bool) (map[string]interface{}, error) {
+func (forceApi *ForceApi) GetAttributes(in SObject, externalObj interface{}, isInsert bool, isGet bool) (map[string]interface{}, error) {
 	fieldsByTag := map[string]attribute{}
 
 	ref := reflect.ValueOf(in)
@@ -363,7 +363,7 @@ func (forceApi *ForceApi) UpsertSObjectByExternalId(id string, in SObject, exter
 
 	resp = &SObjectResponse{}
 
-	attributes, err := forceApi.getAttributes(in, externalObj, false, false)
+	attributes, err := forceApi.GetAttributes(in, externalObj, false, false)
 	if err != nil {
 		return nil, err
 	}

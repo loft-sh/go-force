@@ -89,7 +89,7 @@ func TestUpdateSObject(t *testing.T) {
 	acc := &sobjects.Account{}
 	acc.Name = someText
 
-	err := forceApi.UpdateSObject(AccountId, acc)
+	err := forceApi.UpdateSObject(AccountId, acc, nil)
 	if err != nil {
 		t.Fatalf("Cannot update SObject Account: %v", err)
 	}
@@ -122,7 +122,7 @@ func insertSObject(forceApi *ForceApi, t *testing.T) string {
 	acc := &sobjects.Account{}
 	acc.Name = someText
 
-	resp, err := forceApi.InsertSObject(acc)
+	resp, err := forceApi.InsertSObject(acc, nil)
 	if err != nil {
 		t.Fatalf("Insert SObject Account failed: %v", err)
 	}

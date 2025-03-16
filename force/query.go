@@ -28,9 +28,7 @@ func (forceApi *ForceApi) Query(query string, out interface{}) (err error) {
 		"q": {query},
 	}
 
-	err = forceApi.Get(uri, params, out)
-
-	return
+	return forceApi.Get(uri, params, out)
 }
 
 // Use the QueryAll resource to execute a SOQL query that includes information about records that have
@@ -43,13 +41,9 @@ func (forceApi *ForceApi) QueryAll(query string, out interface{}) (err error) {
 		"q": {query},
 	}
 
-	err = forceApi.Get(uri, params, out)
-
-	return
+	return forceApi.Get(uri, params, out)
 }
 
 func (forceApi *ForceApi) QueryNext(uri string, out interface{}) (err error) {
-	err = forceApi.Get(uri, nil, out)
-
-	return
+	return forceApi.Get(uri, nil, out)
 }
